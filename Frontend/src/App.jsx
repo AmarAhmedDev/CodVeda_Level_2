@@ -1,15 +1,23 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { RefreshCw, LogOut } from 'lucide-react';
 import AddUserForm from './components/AddUserForm';
 import UserCard from './components/UserCard';
+import Login from './components/Login';
+import Signup from './components/Signup';
 
 const API_URL = 'http://localhost:3000/users';
 
-function App() {
+function Dashboard({ setAuthStatus }) {
   const [users, setUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
   const [status, setStatus] = useState({ message: '', isError: false });
+  const navigate = useNavigate();
+
+  // Get current user from local storage
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const isAdmin = currentUser.role === 'admin';
 
   const showStatus = (message, isError = false) => {
     setStatus({ message, isError });
@@ -18,10 +26,27 @@ function App() {
     }, 3000);
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setAuthStatus(false);
+    navigate('/login');
+  };
+
   const fetchUsers = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(API_URL);
+      const token = localStorage.getItem('token');
+      const response = await fetch(API_URL, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.status === 401) {
+        handleLogout();
+        return;
+      }
       if (!response.ok) throw new Error('Failed to fetch users');
       
       const data = await response.json();
@@ -41,14 +66,20 @@ function App() {
   const handleAddUser = async (newUser) => {
     setIsAdding(true);
     try {
+      const token = localStorage.getItem('token');
       const response = await fetch(API_URL, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(newUser)
       });
 
+      if (response.status === 401) {
+        handleLogout();
+        return false;
+      }
       if (!response.ok) throw new Error('Failed to add user');
 
       showStatus('User added successfully!');
@@ -67,10 +98,22 @@ function App() {
     if (!window.confirm('Are you sure you want to delete this user?')) return;
     
     try {
+      const token = localStorage.getItem('token');
       const response = await fetch(`${API_URL}/${id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
 
+      if (response.status === 401) {
+        handleLogout();
+        return;
+      }
+      if (response.status === 403) {
+        showStatus('Admin access required to delete users.', true);
+        return;
+      }
       if (!response.ok) throw new Error('Failed to delete user');
       
       showStatus('User deleted successfully!');
@@ -83,9 +126,17 @@ function App() {
 
   return (
     <div className="container">
-      <header>
+      <header style={{ position: 'relative' }}>
+        <button 
+          onClick={handleLogout}
+          className="btn-icon" 
+          style={{ position: 'absolute', right: 0, top: 0, border: 'none' }}
+          title="Logout"
+        >
+          <LogOut size={24} />
+        </button>
         <h1>User Directory</h1>
-        <p>Manage your team members with style (React Edition)</p>
+        <p>Logged in as: {currentUser.name} ({currentUser.role})</p>
       </header>
 
       <AddUserForm onAddUser={handleAddUser} isLoading={isAdding} />
@@ -128,7 +179,7 @@ function App() {
                   key={user.id} 
                   user={user} 
                   index={index} 
-                  onDelete={handleDeleteUser} 
+                  onDelete={isAdmin ? handleDeleteUser : null} 
                 />
               ))}
             </div>
@@ -136,6 +187,33 @@ function App() {
         </div>
       </div>
     </div>
+  );
+}
+
+function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'));
+  const location = useLocation();
+
+  useEffect(() => {
+    // Check auth status on route change
+    setIsAuthenticated(!!localStorage.getItem('token'));
+  }, [location]);
+
+  return (
+    <Routes>
+      <Route 
+        path="/login" 
+        element={!isAuthenticated ? <Login setAuthStatus={setIsAuthenticated} /> : <Navigate to="/" />} 
+      />
+      <Route 
+        path="/signup" 
+        element={!isAuthenticated ? <Signup setAuthStatus={setIsAuthenticated} /> : <Navigate to="/" />} 
+      />
+      <Route 
+        path="/" 
+        element={isAuthenticated ? <Dashboard setAuthStatus={setIsAuthenticated} /> : <Navigate to="/login" />} 
+      />
+    </Routes>
   );
 }
 

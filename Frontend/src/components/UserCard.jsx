@@ -21,14 +21,16 @@ const UserCard = ({ user, onDelete, index }) => {
         </div>
       </div>
       <div className="user-actions">
-        <button 
-          className="btn-delete" 
-          onClick={() => onDelete(user.id)}
-          aria-label="Delete user"
-        >
-          <Trash2 size={16} />
-          <span>Delete</span>
-        </button>
+        {onDelete && (
+          <button 
+            className="btn-delete" 
+            onClick={() => onDelete(user.id)}
+            aria-label="Delete user"
+          >
+            <Trash2 size={16} />
+            <span>Delete</span>
+          </button>
+        )}
       </div>
     </div>
   );
