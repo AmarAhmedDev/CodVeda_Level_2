@@ -50,7 +50,7 @@ const Signup = ({ setAuthStatus }) => {
           </div>
         )}
 
-        <form onSubmit={handleSignup} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <form onSubmit={handleSignup} className="auth-form">
           <div className="input-group">
             <label htmlFor="name">Full Name</label>
             <input
